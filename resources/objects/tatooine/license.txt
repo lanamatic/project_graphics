@@ -1,0 +1,11 @@
+Model Information:
+* title:	Tatooine
+* source:	https://sketchfab.com/3d-models/tatooine-e1a2af1e90db4b5ebe817b259fe50bf0
+* author:	Deshan (https://sketchfab.com/nufnuf1337)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Tatooine" (https://sketchfab.com/3d-models/tatooine-e1a2af1e90db4b5ebe817b259fe50bf0) by Deshan (https://sketchfab.com/nufnuf1337) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
