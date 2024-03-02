@@ -98,23 +98,39 @@ int main(){
     }
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    stbi_set_flip_vertically_on_load(true);
+
 
     glEnable(GL_DEPTH_TEST);
 
-    Shader groundShader(FileSystem::getPath("resources/shaders/ground.vs").c_str(), FileSystem::getPath("resources/shaders/ground.fs").c_str());
+    //Shader groundShader(FileSystem::getPath("resources/shaders/ground.vs").c_str(), FileSystem::getPath("resources/shaders/ground.fs").c_str());
+    Shader modelShader(FileSystem::getPath("resources/shaders/models.vs").c_str(), FileSystem::getPath("resources/shaders/models.fs").c_str());
+    Model tatooine(FileSystem::getPath("resources/objects/tatooine/scene.gltf"));
+    stbi_set_flip_vertically_on_load(true);
+
+
     //TODO: lights
-    unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/dune.jpg").c_str());
-    unsigned int normalMap  = loadTexture(FileSystem::getPath("resources/textures/dune_normal.jpg").c_str());
-    unsigned int heightMap  = loadTexture(FileSystem::getPath("resources/textures/dune_height.png").c_str());
+//    unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/dune.jpg").c_str());
+//    unsigned int normalMap  = loadTexture(FileSystem::getPath("resources/textures/dune_normal.jpg").c_str());
+//    unsigned int heightMap  = loadTexture(FileSystem::getPath("resources/textures/dune_height.png").c_str());
+//
+//
+//    groundShader.use();
+//    groundShader.setInt("diffuseMap", 0);
+//    groundShader.setInt("normalMap", 1);
+//    groundShader.setInt("depthMap", 2);
 
+//    glm::vec3 lightPos(0.5f, 1.0f, 0.3f);
 
-    groundShader.use();
-    groundShader.setInt("diffuseMap", 0);
-    groundShader.setInt("normalMap", 1);
-    groundShader.setInt("depthMap", 2);
-
-    glm::vec3 lightPos(0.5f, 1.0f, 0.3f);
+    //translation for houses
+    glm::vec3 translation[10];
+    float z[12] = {
+            0.0f, -6.0f, -7.0f,-9.0f, 0.0f, -2.0f,
+            9.0f, 15.0f, 13.0f,5.0f, 6.0f, 10.0f
+    };
+    float x[12]  = {
+            0.0f, -10.0, 8.0f, 2.0f, 12.0f, -15.0,
+            0.0f, -6.0f, 9.f, -10.0f, 11.0, -15.0f
+    };
 
     while(!glfwWindowShouldClose(window)){
 
@@ -127,9 +143,33 @@ int main(){
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+
+        modelShader.use();
         //view/projection matrices
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
+
+        modelShader.setMat4("projection",projection);
+        modelShader.setMat4("view",view);
+
+        //drawing houses one by one, it was faster then instancing
+        for(unsigned int i = 0; i < 12;i++){
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(x[i], 0.0f, z[i]));
+            if(i < 5){
+                model = glm::rotate(model, (float)glm::radians(-90.0), glm::vec3(0, 0, 1));
+                model = glm::rotate(model, (float)glm::radians(-90.0), glm::vec3(0, 1, 0));
+                model = glm::scale(model, glm::vec3(0.5));
+            }else{
+                model = glm::rotate(model, (float)glm::radians(-90.0), glm::vec3(0, 0, 1));
+                model = glm::rotate(model, (float)glm::radians(90.0), glm::vec3(0, 1, 0));
+                model = glm::rotate(model, (float)glm::radians(180.0), glm::vec3(1, 0, 0));
+                model = glm::scale(model, glm::vec3(0.5));
+            }
+
+            modelShader.setMat4("model", model);
+            tatooine.Draw(modelShader);
+        }
 //        groundShader.use();
 //        groundShader.setMat4("projection", projection);
 //        groundShader.setMat4("view", view);
