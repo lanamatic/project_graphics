@@ -23,6 +23,7 @@ void procesInput(GLFWwindow *window);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 unsigned int loadTexture(char const * path);
+void renderCube();
 void renderGround();
 
 
@@ -47,9 +48,6 @@ struct PointLight {
     glm::vec3 diffuse;
     glm::vec3 specular;
 
-    float constant;
-    float linear;
-    float quadratic;
 };
 
 struct DirLight {
@@ -70,9 +68,6 @@ struct SpotLight {
     glm::vec3 diffuse;
     glm::vec3 specular;
 
-    float constant;
-    float linear;
-    float quadratic;
 };
 
 
@@ -114,6 +109,7 @@ int main(){
 
     //Shader groundShader(FileSystem::getPath("resources/shaders/ground.vs").c_str(), FileSystem::getPath("resources/shaders/ground.fs").c_str());
     Shader modelShader(FileSystem::getPath("resources/shaders/models.vs").c_str(), FileSystem::getPath("resources/shaders/models.fs").c_str());
+    Shader lightShader(FileSystem::getPath("resources/shaders/models.vs").c_str(), FileSystem::getPath("resources/shaders/lightCubes.fs").c_str());
 
     Model tatooine(FileSystem::getPath("resources/objects/tatooine/scene.gltf"));
     tatooine.SetTextureNamePrefix("material.");
@@ -128,15 +124,34 @@ int main(){
     directional.diffuse = glm::vec3(0.4f);
     directional.specular = glm::vec3(0.5f);
 
+    //point light positions
+    std::vector<glm::vec3> pointLightPositions;
+    pointLightPositions.push_back(glm::vec3(-9.0f, 0.1f, -2.0f));
+    pointLightPositions.push_back(glm::vec3(-5.0f, 0.1f, -4.0f));
+    pointLightPositions.push_back(glm::vec3(-13.5f, 0.1f, -7.0f));
+    pointLightPositions.push_back(glm::vec3(-5.0f, 0.1f, -8.0f));
+    pointLightPositions.push_back(glm::vec3(0.3f, 0.1f, -6.0f));
+    pointLightPositions.push_back(glm::vec3(7.0f, 0.1f, -2.0f));
+    pointLightPositions.push_back(glm::vec3(12.0f, 0.1f, -5.0f));
+    pointLightPositions.push_back(glm::vec3(-8.0f, 0.1f, 3.0f));
+    pointLightPositions.push_back(glm::vec3(-2.5f, 0.1f, 5.0f));
+    pointLightPositions.push_back(glm::vec3(-13.0f, 0.1f, 8.5f));
+    pointLightPositions.push_back(glm::vec3(-5.0f, 0.1f, 11.0f));
+    pointLightPositions.push_back(glm::vec3(7.0f, 0.1f, 4.5f));
+    pointLightPositions.push_back(glm::vec3(2.0f, 0.1f, 6.5f));
+    pointLightPositions.push_back(glm::vec3(13.0f, 0.1f, 11.0f));
+
+    PointLight pointLights;
+    pointLights.ambient = glm::vec3(1.0f, 0.894f, 0.627f);
+    pointLights.diffuse = glm::vec3(1.0f, 0.894f, 0.627f);
+    pointLights.specular = glm::vec3(1.0f, 0.894f, 0.627f);
+
     SpotLight spotlight;
     spotlight.position = camera.Position;
     spotlight.direction = camera.Front;
     spotlight.ambient = glm::vec3(0.0f);
     spotlight.diffuse = glm::vec3(0.6f);
     spotlight.specular = glm::vec3(0.7f);
-    spotlight.constant = 1.0f;
-    spotlight.linear = 0.09f;
-    spotlight.quadratic = 0.032f;
     spotlight.cutOff = glm::cos(glm::radians(12.5f));
     spotlight.outerCutOff = glm::cos(glm::radians(17.0f));
 //    unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/dune.jpg").c_str());
@@ -191,14 +206,19 @@ int main(){
         modelShader.setVec3("directional.diffuse", directional.diffuse);
         modelShader.setVec3("directional.specular", directional.specular);
 
+        //Point Lights
+        for(unsigned int i = 0; i < pointLightPositions.size(); i++){
+            modelShader.setVec3("pointlight[" + std::to_string(i) + "].position", pointLightPositions[i]);
+            modelShader.setVec3("pointlight[" + std::to_string(i) + "].ambient", pointLights.ambient * 0.05f);
+            modelShader.setVec3("pointlight[" + std::to_string(i) + "].diffuse", pointLights.diffuse * 0.8f);
+            modelShader.setVec3("pointlight[" + std::to_string(i) + "].specular", pointLights.specular * 0.1f);
+        }
+
         //Spotlight
         modelShader.setVec3("spotlight.position", camera.Position);
         modelShader.setVec3("spotlight.direction", camera.Front);
         modelShader.setVec3("spotlight.ambient", spotlight.ambient);
         modelShader.setVec3("spotlight.diffuse", spotlight.diffuse);
-        modelShader.setFloat("spotlight.constant", spotlight.constant);
-        modelShader.setFloat("spotlight.linear", spotlight.linear);
-        modelShader.setFloat("spotlight.quadratic", spotlight.quadratic);
         modelShader.setFloat("spotlight.cutOff", spotlight.cutOff);
         modelShader.setFloat("spotlight.outerCutOff", spotlight.outerCutOff);
 
@@ -223,6 +243,21 @@ int main(){
             modelShader.setMat4("model", model);
             tatooine.Draw(modelShader);
         }
+
+        //light cubes
+        lightShader.use();
+        lightShader.setMat4("projection", projection);
+        lightShader.setMat4("view", glm::translate(view, glm::vec3(0.0f, 0.15f + 0.1*sin(glfwGetTime()), 0.0f)));
+        glm::mat4 model = glm::mat4(1.0f);
+        for(unsigned int i = 0; i < pointLightPositions.size(); i++){
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(pointLightPositions[i]));
+            model = glm::scale(model, glm::vec3(0.09f));
+            lightShader.setMat4("model", model);
+            lightShader.setVec3("lightColor",glm::vec3(1.0f, 0.894f, 0.627f));
+            renderCube();
+        }
+
 //        groundShader.use();
 //        groundShader.setMat4("projection", projection);
 //        groundShader.setMat4("view", view);
@@ -366,6 +401,79 @@ unsigned int loadTexture(char const * path)
     }
 
     return textureID;
+}
+
+//light cubes
+unsigned int cubeVAO = 0;
+unsigned int cubeVBO = 0;
+void renderCube(){
+    // initialize (if necessary)
+    if (cubeVAO == 0){
+        float vertices[] = {
+                //position                      //normals                           //texture coords
+                // back face
+                -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
+                1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
+                1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right
+                1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
+                -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
+                -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 1.0f, // top-left
+                // front face
+                -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
+                1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f, // bottom-right
+                1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
+                1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
+                -1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f, // top-left
+                -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
+                // left face
+                -1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
+                -1.0f,  1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-left
+                -1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
+                -1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
+                -1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-right
+                -1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
+                // right face
+                1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
+                1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
+                1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right
+                1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
+                1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
+                1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left
+                // bottom face
+                -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
+                1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 1.0f, // top-left
+                1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
+                1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
+                -1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 0.0f, // bottom-right
+                -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
+                // top face
+                -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
+                1.0f,  1.0f , 1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
+                1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right
+                1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
+                -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
+                -1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left
+        };
+        glGenVertexArrays(1, &cubeVAO);
+        glGenBuffers(1, &cubeVBO);
+
+        glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+        glBindVertexArray(cubeVAO);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+    }
+    // render Cube
+    glBindVertexArray(cubeVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
 }
 
 //Normal-Parallax mapping for ground
