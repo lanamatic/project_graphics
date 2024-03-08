@@ -35,7 +35,8 @@ float lastY = SCR_HEIGHT/2.0;
 float heightScale = 0.1;
 bool gammaEnabled = false;
 bool gammaKeyPressed = false;
-
+bool blinn = false;
+bool blinnKeyPressed = false;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
@@ -60,6 +61,15 @@ struct DirLight {
 };
 
 struct SpotLight {
+    glm::vec3 position;
+    glm::vec3 direction;
+    float cutOff;
+    float outerCutOff;
+
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
+
     float constant;
     float linear;
     float quadratic;
@@ -104,11 +114,31 @@ int main(){
 
     //Shader groundShader(FileSystem::getPath("resources/shaders/ground.vs").c_str(), FileSystem::getPath("resources/shaders/ground.fs").c_str());
     Shader modelShader(FileSystem::getPath("resources/shaders/models.vs").c_str(), FileSystem::getPath("resources/shaders/models.fs").c_str());
+
     Model tatooine(FileSystem::getPath("resources/objects/tatooine/scene.gltf"));
+    tatooine.SetTextureNamePrefix("material.");
+
     stbi_set_flip_vertically_on_load(true);
 
 
     //TODO: lights
+    DirLight directional;
+    directional.direction = glm::vec3(-0.7f, -1.0f, -0.4f);
+    directional.ambient = glm::vec3(0.07f);
+    directional.diffuse = glm::vec3(0.4f);
+    directional.specular = glm::vec3(0.5f);
+
+    SpotLight spotlight;
+    spotlight.position = camera.Position;
+    spotlight.direction = camera.Front;
+    spotlight.ambient = glm::vec3(0.0f);
+    spotlight.diffuse = glm::vec3(0.6f);
+    spotlight.specular = glm::vec3(0.7f);
+    spotlight.constant = 1.0f;
+    spotlight.linear = 0.09f;
+    spotlight.quadratic = 0.032f;
+    spotlight.cutOff = glm::cos(glm::radians(12.5f));
+    spotlight.outerCutOff = glm::cos(glm::radians(17.0f));
 //    unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/dune.jpg").c_str());
 //    unsigned int normalMap  = loadTexture(FileSystem::getPath("resources/textures/dune_normal.jpg").c_str());
 //    unsigned int heightMap  = loadTexture(FileSystem::getPath("resources/textures/dune_height.png").c_str());
@@ -151,6 +181,29 @@ int main(){
 
         modelShader.setMat4("projection",projection);
         modelShader.setMat4("view",view);
+
+        modelShader.setVec3("viewPos", camera.Position);
+        modelShader.setFloat("material.shininess", 16.0f);
+
+        //Directional light
+        modelShader.setVec3("directional.direction", directional.direction);
+        modelShader.setVec3("directional.ambient", directional.ambient);
+        modelShader.setVec3("directional.diffuse", directional.diffuse);
+        modelShader.setVec3("directional.specular", directional.specular);
+
+        //Spotlight
+        modelShader.setVec3("spotlight.position", camera.Position);
+        modelShader.setVec3("spotlight.direction", camera.Front);
+        modelShader.setVec3("spotlight.ambient", spotlight.ambient);
+        modelShader.setVec3("spotlight.diffuse", spotlight.diffuse);
+        modelShader.setFloat("spotlight.constant", spotlight.constant);
+        modelShader.setFloat("spotlight.linear", spotlight.linear);
+        modelShader.setFloat("spotlight.quadratic", spotlight.quadratic);
+        modelShader.setFloat("spotlight.cutOff", spotlight.cutOff);
+        modelShader.setFloat("spotlight.outerCutOff", spotlight.outerCutOff);
+
+        modelShader.setBool("blinn", blinn);
+        std::cout << (blinn ? "Blinn-Phong" : "Phong");
 
         //drawing houses one by one, it was faster then instancing
         for(unsigned int i = 0; i < 12;i++){
@@ -241,6 +294,17 @@ void procesInput(GLFWwindow *window){
             heightScale += 0.0005f;
         else
             heightScale = 1.0f;
+    }
+
+    //Blinn-Phong
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS && !blinnKeyPressed)
+    {
+        blinn = !blinn;
+        blinnKeyPressed = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_RELEASE)
+    {
+        blinnKeyPressed = false;
     }
 
 }
