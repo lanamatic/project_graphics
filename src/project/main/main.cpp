@@ -42,6 +42,8 @@ bool blinnKeyPressed = false;
 bool bloom = true;
 bool bloomKeyPressed = false;
 float exposure = 0.77f;
+bool grayscale = false;
+bool grayscaleKeyPressed = false;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
@@ -124,6 +126,7 @@ int main(){
     stbi_set_flip_vertically_on_load(true);
 
     //configure floating point framebuffer
+    //multisample anti-aliacing
 //----------------------------------------------------------
     unsigned int hdrFBO;
     glGenFramebuffers(1, &hdrFBO);
@@ -133,24 +136,34 @@ int main(){
     glGenTextures(2, colorBuffers);
     for (unsigned int i = 0; i < 2; i++)
     {
-        glBindTexture(GL_TEXTURE_2D, colorBuffers[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, colorBuffers[i]);
+        glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
+//        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         // attach texture to framebuffer
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, colorBuffers[i], 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D_MULTISAMPLE, colorBuffers[i], 0);
     }
+
+    unsigned int textureColorBufferMultiSampled;
+    glGenTextures(1, &textureColorBufferMultiSampled);
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled);
+    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGB, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled, 0);
+
+
     //depth attachment
     unsigned int rboDepth;
     glGenRenderbuffers(1, &rboDepth);
     glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SCR_WIDTH, SCR_HEIGHT);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH_COMPONENT, SCR_WIDTH, SCR_HEIGHT);
+//    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SCR_WIDTH, SCR_HEIGHT);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
     //which color attachment we'll use for rendering
-    unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    glDrawBuffers(2, attachments);
+    unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, attachments);
     //is framebuffer complete?
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         std::cout << "Framebuffer not complete!" << std::endl;
@@ -163,13 +176,14 @@ int main(){
     glGenTextures(2, pingpongColorbuffers);for (unsigned int i = 0; i < 2; i++)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
-        glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers[i], 0);
+        glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, pingpongColorbuffers[i]);
+        glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
+//        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
+        glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, pingpongColorbuffers[i], 0);
         //are framebuffers complete?
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
             std::cout << "Framebuffer not complete!" << std::endl;
@@ -242,6 +256,7 @@ int main(){
     finalShader.use();
     finalShader.setInt("scene", 0);
     finalShader.setInt("bloomBlur", 1);
+
 
     while(!glfwWindowShouldClose(window)){
 
@@ -338,7 +353,10 @@ int main(){
         {
             glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal]);
             blurShader.setInt("horizontal", horizontal);
-            glBindTexture(GL_TEXTURE_2D, first_iteration ? colorBuffers[1] : pingpongColorbuffers[!horizontal]);
+            blurShader.setInt("SCR_WIDTH", SCR_WIDTH);
+            blurShader.setInt("SCR_HEIGHT", SCR_HEIGHT);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, first_iteration ? colorBuffers[1] : pingpongColorbuffers[!horizontal]);
             renderQuad();
             horizontal = !horizontal;
             if (first_iteration)
@@ -348,14 +366,20 @@ int main(){
 
         // render floating point color buffer to 2D quad and tonemap HDR colors to default framebuffer's (clamped) color range
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         finalShader.use();
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, colorBuffers[0]);
+        glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, colorBuffers[0]);
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[!horizontal]);
+        glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, pingpongColorbuffers[!horizontal]);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled);
+        finalShader.setInt("SCR_WIDTH", SCR_WIDTH);
+        finalShader.setInt("SCR_HEIGHT", SCR_HEIGHT);
         finalShader.setInt("bloom", bloom);
         finalShader.setFloat("exposure", exposure);
         finalShader.setInt("gammaEnabled",gammaEnabled);
+        finalShader.setInt("grayscale", grayscale);
         renderQuad();
 
         std::cout << "bloom: " << (bloom ? "on" : "off") << "| exposure: " << exposure << std::endl;
@@ -469,6 +493,17 @@ void procesInput(GLFWwindow *window){
         exposure += 0.001f;
     }
 
+    //post-processing grayscale
+    if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS && !grayscaleKeyPressed)
+    {
+        grayscale = !grayscale;
+        grayscaleKeyPressed = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_X) == GLFW_RELEASE)
+    {
+        grayscaleKeyPressed= false;
+    }
+
 }
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos){
@@ -536,25 +571,29 @@ unsigned int quadVBO;
 void renderQuad(){
     if (quadVAO == 0){
         float quadVertices[] = {
-                // positions        // texture Coords
-                -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-                -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-                1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-                1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+                // positions            // texCoords
+                -1.0f,  1.0f,  0.0f, 1.0f,
+                -1.0f, -1.0f,  0.0f, 0.0f,
+                1.0f, -1.0f,  1.0f, 0.0f,
+
+                -1.0f,  1.0f,  0.0f, 1.0f,
+                1.0f, -1.0f,  1.0f, 0.0f,
+                1.0f,  1.0f,  1.0f, 1.0f
         };
-        // setup plane VAO
+
+        //setup plane VAO
         glGenVertexArrays(1, &quadVAO);
         glGenBuffers(1, &quadVBO);
         glBindVertexArray(quadVAO);
         glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     }
     glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
 }
 
