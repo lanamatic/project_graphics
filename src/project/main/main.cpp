@@ -113,7 +113,7 @@ int main(){
 
     glEnable(GL_DEPTH_TEST);
 
-    //Shader groundShader(FileSystem::getPath("resources/shaders/ground.vs").c_str(), FileSystem::getPath("resources/shaders/ground.fs").c_str());
+    Shader groundShader(FileSystem::getPath("resources/shaders/ground.vs").c_str(), FileSystem::getPath("resources/shaders/ground.fs").c_str());
     Shader modelShader(FileSystem::getPath("resources/shaders/models.vs").c_str(), FileSystem::getPath("resources/shaders/models.fs").c_str());
     Shader lightShader(FileSystem::getPath("resources/shaders/models.vs").c_str(), FileSystem::getPath("resources/shaders/lightCubes.fs").c_str());
     Shader blurShader(FileSystem::getPath("resources/shaders/blur.vs").c_str(), FileSystem::getPath("resources/shaders/blur.fs").c_str());
@@ -132,6 +132,11 @@ int main(){
 
     stbi_set_flip_vertically_on_load(true);
 
+    unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/dune.jpg").c_str());
+    unsigned int normalMap  = loadTexture(FileSystem::getPath("resources/textures/dune_normal.jpg").c_str());
+    unsigned int heightMap  = loadTexture(FileSystem::getPath("resources/textures/dune_height.png").c_str());
+
+
     //configure floating point framebuffer
     //multisample anti-aliacing
 //----------------------------------------------------------
@@ -141,8 +146,7 @@ int main(){
     //2 floating point color buffers: 1-normal rendering, 2-brightness values
     unsigned int colorBuffers[2];
     glGenTextures(2, colorBuffers);
-    for (unsigned int i = 0; i < 2; i++)
-    {
+    for (unsigned int i = 0; i < 2; i++){
         glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, colorBuffers[i]);
         glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
 //        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
@@ -180,8 +184,7 @@ int main(){
     unsigned int pingpongFBO[2];
     unsigned int pingpongColorbuffers[2];
     glGenFramebuffers(2, pingpongFBO);
-    glGenTextures(2, pingpongColorbuffers);for (unsigned int i = 0; i < 2; i++)
-    {
+    glGenTextures(2, pingpongColorbuffers);for (unsigned int i = 0; i < 2; i++){
         glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
         glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, pingpongColorbuffers[i]);
         glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
@@ -198,7 +201,7 @@ int main(){
 //----------------------------------------------------------
 
 
-    //TODO: lights
+    //directional light init
     DirLight directional;
     directional.direction = glm::vec3(-0.7f, -1.0f, -0.4f);
     directional.ambient = glm::vec3(0.09f);
@@ -224,12 +227,15 @@ int main(){
     pointLightPositions.push_back(glm::vec3(4.0f, 0.1f, -2.0f));
     pointLightPositions.push_back(glm::vec3(-3.5f, 0.1f, -2.1f));
     pointLightPositions.push_back(glm::vec3(9.0f, 0.1f, 3.0f));
+    pointLightPositions.push_back(glm::vec3 (3.0f, 0.1f, 2.3f));
 
+    //point light init
     PointLight pointLights;
     pointLights.ambient = glm::vec3(5.5f, 3.7f, 1.0f);
     pointLights.diffuse = glm::vec3(5.5f, 3.7f, 1.0f);
     pointLights.specular = glm::vec3(5.5f, 3.7f, 1.0f);
 
+    //spotlight init
     SpotLight spotlight;
     spotlight.position = camera.Position;
     spotlight.direction = camera.Front;
@@ -238,17 +244,6 @@ int main(){
     spotlight.specular = glm::vec3(1.0f, 0.894f, 0.627f);
     spotlight.cutOff = glm::cos(glm::radians(12.5f));
     spotlight.outerCutOff = glm::cos(glm::radians(17.0f));
-//    unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/dune.jpg").c_str());
-//    unsigned int normalMap  = loadTexture(FileSystem::getPath("resources/textures/dune_normal.jpg").c_str());
-//    unsigned int heightMap  = loadTexture(FileSystem::getPath("resources/textures/dune_height.png").c_str());
-//
-//
-//    groundShader.use();
-//    groundShader.setInt("diffuseMap", 0);
-//    groundShader.setInt("normalMap", 1);
-//    groundShader.setInt("depthMap", 2);
-
-//    glm::vec3 lightPos(0.5f, 1.0f, 0.3f);
 
     //translation for houses
     glm::vec3 translation[10];
@@ -266,6 +261,10 @@ int main(){
     finalShader.use();
     finalShader.setInt("scene", 0);
     finalShader.setInt("bloomBlur", 1);
+    groundShader.use();
+    groundShader.setInt("diffuseMap", 0);
+    groundShader.setInt("normalMap", 1);
+    groundShader.setInt("depthMap", 2);
 
 
     while(!glfwWindowShouldClose(window)){
@@ -320,7 +319,7 @@ int main(){
         modelShader.setBool("blinn", blinn);
         std::cout << (blinn ? "Blinn-Phong" : "Phong") << std::endl;
 
-        //drawing houses one by one, it faster than instancing :)
+        //drawing houses one by one was faster than instancing :)
         for(unsigned int i = 0; i < 12;i++){
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::translate(model, glm::vec3(x[i], 0.0f, z[i]));
@@ -390,6 +389,48 @@ int main(){
         }
         glDisable(GL_CULL_FACE);
 
+        //ground
+        groundShader.use();
+        groundShader.setMat4("projection", projection);
+        groundShader.setMat4("view", view);
+        groundShader.setVec3("viewPos", camera.Position);
+        //dirlight
+        groundShader.setVec3("directional.direction", directional.direction);
+        groundShader.setVec3("directional.ambient", directional.ambient);
+        groundShader.setVec3("directional.diffuse", directional.diffuse);
+        groundShader.setVec3("directional.specular", directional.specular);
+        //Point Lights
+        for(unsigned int i = 0; i < pointLightPositions.size(); i++){
+            groundShader.setVec3("pointlight[" + std::to_string(i) + "].position", pointLightPositions[i]);
+            groundShader.setVec3("pointlight[" + std::to_string(i) + "].ambient", pointLights.ambient * 0.05f);
+            groundShader.setVec3("pointlight[" + std::to_string(i) + "].diffuse", pointLights.diffuse * 0.7f);
+            groundShader.setVec3("pointlight[" + std::to_string(i) + "].specular", pointLights.specular * 0.0f);
+        }
+        //Spotlight
+        groundShader.setVec3("spotlight.position", camera.Position);
+        groundShader.setVec3("spotlight.direction", camera.Front);
+        groundShader.setVec3("spotlight.ambient", spotlight.ambient);
+        groundShader.setVec3("spotlight.diffuse", spotlight.diffuse);
+
+        groundShader.setFloat("spotlight.cutOff", spotlight.cutOff);
+        groundShader.setFloat("spotlight.outerCutOff", spotlight.outerCutOff);
+
+        groundShader.setBool("blinn", blinn);
+
+        //normal and parallax mapping
+        model = glm::mat4(1.0f);
+        groundShader.setMat4("model", model);
+        groundShader.setFloat("height_scale", heightScale);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, diffuseMap);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, normalMap);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, heightMap);
+
+        renderGround();
+
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 //----------------------------------------------------------
 
@@ -434,28 +475,6 @@ int main(){
         std::cout << (gammaEnabled ? "Gamma enabled" : "Gamma disabled") << std::endl;
 //----------------------------------------------------------
 
-//        groundShader.use();
-//        groundShader.setMat4("projection", projection);
-//        groundShader.setMat4("view", view);
-//
-//        // render parallax-mapped ground
-//        glm::mat4 model = glm::mat4(1.0f);
-//        groundShader.setMat4("model", model);
-//        groundShader.setVec3("viewPos", camera.Position);
-//        groundShader.setVec3("lightPos", lightPos);
-//        groundShader.setFloat("heightScale", heightScale); // adjust with Q and E keys
-//        groundShader.setBool("gamma",gammaEnabled);
-//        std::cout << heightScale << std::endl;
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, diffuseMap);
-//        glActiveTexture(GL_TEXTURE1);
-//        glBindTexture(GL_TEXTURE_2D, normalMap);
-//        glActiveTexture(GL_TEXTURE2);
-//        glBindTexture(GL_TEXTURE_2D, heightMap);
-//        renderGround();
-//
-//        std::cout << (gammaEnabled ? "Gamma enabled" : "Gamma disabled") << std::endl;
-//
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -484,60 +503,40 @@ void procesInput(GLFWwindow *window){
         camera.ProcessKeyboard(RIGHT, deltaTime);
 
     //gamma correction
-    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS && !gammaKeyPressed)
-    {
+    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS && !gammaKeyPressed){
         gammaEnabled = !gammaEnabled;
         gammaKeyPressed = true;
     }
-    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_RELEASE)
-    {
+    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_RELEASE){
         gammaKeyPressed = false;
     }
 
-    //heightScale for parallax mapping
-//    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
-//        if (heightScale > 0.0f)
-//            heightScale -= 0.0005f;
-//        else
-//            heightScale = 0.0f;
-//    } else if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
-//        if (heightScale < 1.0f)
-//            heightScale += 0.0005f;
-//        else
-//            heightScale = 1.0f;
-//    }
 
     //Blinn-Phong
-    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS && !blinnKeyPressed)
-    {
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS && !blinnKeyPressed){
         blinn = !blinn;
         blinnKeyPressed = true;
     }
-    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_RELEASE)
-    {
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_RELEASE){
         blinnKeyPressed = false;
     }
 
     //Bloom
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !bloomKeyPressed)
-    {
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !bloomKeyPressed){
         bloom = !bloom;
         bloomKeyPressed = true;
     }
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE)
-    {
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE){
         bloomKeyPressed = false;
     }
 
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-    {
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
         if (exposure > 0.0f)
             exposure -= 0.001f;
         else
             exposure = 0.0f;
     }
-    else if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-    {
+    else if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
         exposure += 0.001f;
     }
 
@@ -546,8 +545,7 @@ void procesInput(GLFWwindow *window){
         grayscale = !grayscale;
         grayscaleKeyPressed = true;
     }
-    if (glfwGetKey(window, GLFW_KEY_X) == GLFW_RELEASE)
-    {
+    if (glfwGetKey(window, GLFW_KEY_X) == GLFW_RELEASE){
         grayscaleKeyPressed= false;
     }
 
@@ -582,8 +580,7 @@ unsigned int loadTexture(char const * path)
 
     int width, height, nrComponents;
     unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
-    if (data)
-    {
+    if (data){
         GLenum format;
         if (nrComponents == 1)
             format = GL_RED;
@@ -722,13 +719,12 @@ unsigned int groundVAO = 0;
 unsigned int groundVBO;
 void renderGround(){
 
-    if (groundVAO == 0)
-    {
+    if (groundVAO == 0){
         // positions
-        glm::vec3 pos1(60.0f,  0.0f, 60.0f);
-        glm::vec3 pos2(60.0f, 0.0f, -60.0f);
-        glm::vec3 pos3( -60.0f, 0.0f, -60.0f);
-        glm::vec3 pos4( -60.0f,  0.0f, 60.0f);
+        glm::vec3 pos1(60.0f,  -0.8f, 60.0f);
+        glm::vec3 pos2(60.0f, -0.8f, -60.0f);
+        glm::vec3 pos3( -60.0f, -0.8f, -60.0f);
+        glm::vec3 pos4( -60.0f,  -0.8f, 60.0f);
         // texture coordinates
         glm::vec2 uv1(0.0f, 1.0f);
         glm::vec2 uv2(0.0f, 0.0f);

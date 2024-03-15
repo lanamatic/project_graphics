@@ -38,7 +38,7 @@ struct SpotLight{
 
 };
 
-#define N_POINT_LIGHTS 17
+#define N_POINT_LIGHTS 18
 
 in vec3 FragPos;
 in vec3 Normal;
