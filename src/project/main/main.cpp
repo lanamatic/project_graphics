@@ -28,7 +28,7 @@ void renderCube();
 void renderGround();
 
 
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, 4.0f));
 
 bool firstMouse = true;
 
@@ -123,6 +123,13 @@ int main(){
     Model tatooine(FileSystem::getPath("resources/objects/tatooine/scene.gltf"));
     tatooine.SetTextureNamePrefix("material.");
 
+    Model mando(FileSystem::getPath("resources/objects/mando/scene.gltf"));
+    mando.SetTextureNamePrefix("material.");
+
+    Model sphere(FileSystem::getPath("resources/objects/sfera/scene.gltf"));
+    sphere.SetTextureNamePrefix("material.");
+
+
     stbi_set_flip_vertically_on_load(true);
 
     //configure floating point framebuffer
@@ -214,6 +221,9 @@ int main(){
     pointLightPositions.push_back(glm::vec3(7.0f, 0.1f, 4.5f));
     pointLightPositions.push_back(glm::vec3(2.0f, 0.1f, 6.5f));
     pointLightPositions.push_back(glm::vec3(13.0f, 0.1f, 11.0f));
+    pointLightPositions.push_back(glm::vec3(4.0f, 0.1f, -2.0f));
+    pointLightPositions.push_back(glm::vec3(-3.5f, 0.1f, -2.1f));
+    pointLightPositions.push_back(glm::vec3(9.0f, 0.1f, 3.0f));
 
     PointLight pointLights;
     pointLights.ambient = glm::vec3(5.5f, 3.7f, 1.0f);
@@ -243,7 +253,7 @@ int main(){
     //translation for houses
     glm::vec3 translation[10];
     float z[12] = {
-            0.0f, -6.0f, -7.0f,-9.0f, 0.0f, -2.0f,
+            -1.0f, -6.0f, -7.0f,-9.0f, 0.0f, -2.0f,
             9.0f, 15.0f, 13.0f,5.0f, 6.0f, 10.0f
     };
     float x[12]  = {
@@ -310,7 +320,7 @@ int main(){
         modelShader.setBool("blinn", blinn);
         std::cout << (blinn ? "Blinn-Phong" : "Phong") << std::endl;
 
-        //drawing houses one by one, it was faster then instancing
+        //drawing houses one by one, it faster than instancing :)
         for(unsigned int i = 0; i < 12;i++){
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::translate(model, glm::vec3(x[i], 0.0f, z[i]));
@@ -329,11 +339,47 @@ int main(){
             tatooine.Draw(modelShader);
         }
 
+        //face culling
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+
+        //mandalorian & grogu
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(3.0f, -0.6f, 1.0f));
+        model = glm::rotate(model, (float)glm::radians(-90.0), glm::vec3(1, 0, 0));
+        model = glm::rotate(model, (float)glm::radians(-45.0), glm::vec3(0, 0, 1));
+        model = glm::scale(model, glm::vec3(0.1));
+        modelShader.setMat4("model", model);
+        mando.Draw(modelShader);
+
+        //spheres
+        float center_x = 3.0f;
+        float center_y = -0.4f;
+        float center_z = 1.0f;
+        float helix_radius = 0.5f;
+        float helix_loop_height = 0.3f;
+        float angular_speed = 1.5f;
+
+        for (int i = 0; i < 3; ++i) {
+            float angle = glfwGetTime() * angular_speed + (2.0f * M_PI / 3.0f) * i;
+            float x = center_x + helix_radius * cos(angle);
+            float y = center_y + i * helix_loop_height ;
+            float z = center_z + helix_radius * sin(angle);
+
+            // Draw the sphere
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3 (x, y, z));
+            model = glm::scale(model, glm::vec3(0.05));
+            modelShader.setMat4("model", model);
+            sphere.Draw(modelShader);
+
+        }
+
         //light cubes
         lightShader.use();
         lightShader.setMat4("projection", projection);
         lightShader.setMat4("view", glm::translate(view, glm::vec3(0.0f, 0.15f + 0.1*sin(glfwGetTime()), 0.0f)));
-        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::mat4(1.0f);
         for(unsigned int i = 0; i < pointLightPositions.size(); i++){
             model = glm::mat4(1.0f);
             model = glm::translate(model, glm::vec3(pointLightPositions[i]));
@@ -342,6 +388,8 @@ int main(){
             lightShader.setVec3("lightColor",glm::vec3(5.5f, 3.7f, 1.0f));
             renderCube();
         }
+        glDisable(GL_CULL_FACE);
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 //----------------------------------------------------------
 
@@ -494,8 +542,7 @@ void procesInput(GLFWwindow *window){
     }
 
     //post-processing grayscale
-    if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS && !grayscaleKeyPressed)
-    {
+    if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS && !grayscaleKeyPressed){
         grayscale = !grayscale;
         grayscaleKeyPressed = true;
     }
