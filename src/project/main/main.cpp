@@ -146,7 +146,7 @@ int main(){
 #endif
 
     //create window
-    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "This is the way", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "this is the way", nullptr, nullptr);
     if(window == nullptr){
         std::cerr << "Failed to create a window!\n";
         glfwTerminate();
