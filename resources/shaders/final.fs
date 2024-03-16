@@ -15,7 +15,6 @@ uniform bool gammaEnabled;
 uniform float exposure;
 uniform bool grayscale;
 
-
 void main(){
     const float gamma = 2.2;
 //     vec3 hdrColor = texture(scene, TexCoords).rgb;
@@ -51,9 +50,12 @@ void main(){
     // gamma correction
     if(gammaEnabled)
         result = pow(result, vec3(1.0 / gamma));
+
+    //post-processing greyscale
     if(grayscale){
         float gray = 0.2126 * result.r + 0.7152 * result.g + 0.0722 * result.b;
         result = vec3(gray);
     }
+
     FragColor = vec4(result, 1.0);
 }

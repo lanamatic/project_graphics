@@ -2,9 +2,15 @@
 // Created by Lana Matic on 13.2.24..
 //
 
+#define GLFW_INCLUDE_NONE
 #include <iostream>
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
+
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+
 #include "learnopengl/shader.h"
 #include "rg/Error.h"
 #include "learnopengl/filesystem.h"
@@ -22,6 +28,7 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void procesInput(GLFWwindow *window);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
+void keycallback(GLFWwindow* window, int key, int scanode, int action, int mods);
 unsigned int loadTexture(char const * path);
 unsigned int loadCubemap(vector<std::string> faces);
 void renderQuad();
@@ -29,13 +36,14 @@ void renderCube();
 void renderGround();
 
 
-Camera camera(glm::vec3(0.0f, 0.0f, 4.0f));
+//Camera camera(glm::vec3(0.0f, 0.0f, 4.0f));
 
 bool firstMouse = true;
 
 float lastX = SCR_WIDTH/2.0;
 float lastY = SCR_HEIGHT/2.0;
 float heightScale = 0.1;
+
 bool gammaEnabled = false;
 bool gammaKeyPressed = false;
 bool blinn = false;
@@ -79,6 +87,52 @@ struct SpotLight {
 
 };
 
+struct ProgramState{
+    bool ImGuiEnabled = false;
+    Camera camera;
+    ProgramState() : camera(glm::vec3(0.0f, 0.0f, 4.0f)){}
+
+    float angular_speed = 1.5f;
+
+    void LoadFromDisk(std::string path);
+    void SaveToDisk(std::string path);
+
+};
+
+void ProgramState::SaveToDisk(std::string path){
+
+    std::ofstream out(path);
+    out << ImGuiEnabled << '\n'
+        << camera.Position.x << '\n'
+        << camera.Position.y << '\n'
+        << camera.Position.z << '\n'
+        << camera.Front.x << '\n'
+        << camera.Front.x << '\n'
+        << camera.Front.x << '\n'
+        << camera.Pitch << '\n'
+        << camera.Yaw << '\n';
+}
+
+void ProgramState::LoadFromDisk(std::string path){
+
+    std::ifstream in(path);
+    if(in){
+        in >> ImGuiEnabled
+           >> camera.Position.x
+           >> camera.Position.y
+           >> camera.Position.z
+           >> camera.Front.x
+           >> camera.Front.x
+           >> camera.Front.x
+           >> camera.Pitch
+           >> camera.Yaw;
+    }
+}
+
+ProgramState* programState;
+void DrawImGui(ProgramState* programState);
+bool cameraInfo = false;
+static void Help(const char* desc, bool extraText = false);
 
 int main(){
 
@@ -103,6 +157,7 @@ int main(){
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
+    glfwSetKeyCallback(window, keycallback);
 
     //load opengl functions
     if(!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)){
@@ -111,12 +166,27 @@ int main(){
         return EXIT_FAILURE;
     }
 
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    //ImGui init
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
 
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330 core");
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    programState = new ProgramState;
+    programState->LoadFromDisk(FileSystem::getPath("resources/programState.txt"));
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    if(programState->ImGuiEnabled){
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
 
     Shader groundShader(FileSystem::getPath("resources/shaders/ground.vs").c_str(), FileSystem::getPath("resources/shaders/ground.fs").c_str());
     Shader modelShader(FileSystem::getPath("resources/shaders/models.vs").c_str(), FileSystem::getPath("resources/shaders/models.fs").c_str());
@@ -191,7 +261,8 @@ int main(){
     unsigned int pingpongFBO[2];
     unsigned int pingpongColorbuffers[2];
     glGenFramebuffers(2, pingpongFBO);
-    glGenTextures(2, pingpongColorbuffers);for (unsigned int i = 0; i < 2; i++){
+    glGenTextures(2, pingpongColorbuffers);
+    for (unsigned int i = 0; i < 2; i++){
         glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
         glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, pingpongColorbuffers[i]);
         glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
@@ -245,8 +316,8 @@ int main(){
 
     //spotlight init
     SpotLight spotlight;
-    spotlight.position = camera.Position;
-    spotlight.direction = camera.Front;
+    spotlight.position = programState->camera.Position;
+    spotlight.direction = programState->camera.Front;
     spotlight.ambient = glm::vec3(0.2f);
     spotlight.diffuse = glm::vec3(1.0f, 0.894f, 0.627f);
     spotlight.specular = glm::vec3(1.0f, 0.894f, 0.627f);
@@ -393,7 +464,7 @@ int main(){
         std::map<float, glm::vec3> sorted;
         for (unsigned int i = 0; i < grassPosition.size(); i++)
         {
-            float distance = glm::length(camera.Position - grassPosition[i]);
+            float distance = glm::length(programState->camera.Position - grassPosition[i]);
             sorted[distance] = grassPosition[i];
         }
 
@@ -404,13 +475,13 @@ int main(){
 
         modelShader.use();
         //view/projection matrices
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 view = programState->camera.GetViewMatrix();
 
         modelShader.setMat4("projection",projection);
         modelShader.setMat4("view",view);
 
-        modelShader.setVec3("viewPos", camera.Position);
+        modelShader.setVec3("viewPos", programState->camera.Position);
         modelShader.setFloat("material.shininess", 16.0f);
 
         //Directional light
@@ -428,8 +499,8 @@ int main(){
         }
 
         //Spotlight
-        modelShader.setVec3("spotlight.position", camera.Position);
-        modelShader.setVec3("spotlight.direction", camera.Front);
+        modelShader.setVec3("spotlight.position", programState->camera.Position);
+        modelShader.setVec3("spotlight.direction", programState->camera.Front);
         modelShader.setVec3("spotlight.ambient", spotlight.ambient);
         modelShader.setVec3("spotlight.diffuse", spotlight.diffuse);
         modelShader.setFloat("spotlight.cutOff", spotlight.cutOff);
@@ -476,10 +547,9 @@ int main(){
         float center_z = 1.0f;
         float helix_radius = 0.5f;
         float helix_loop_height = 0.3f;
-        float angular_speed = 1.5f;
 
         for (int i = 0; i < 3; ++i) {
-            float angle = glfwGetTime() * angular_speed + (2.0f * M_PI / 3.0f) * i;
+            float angle = glfwGetTime() * programState->angular_speed + (2.0f * M_PI / 3.0f) * i;
             float x = center_x + helix_radius * cos(angle);
             float y = center_y + i * helix_loop_height ;
             float z = center_z + helix_radius * sin(angle);
@@ -528,7 +598,7 @@ int main(){
         groundShader.use();
         groundShader.setMat4("projection", projection);
         groundShader.setMat4("view", view);
-        groundShader.setVec3("viewPos", camera.Position);
+        groundShader.setVec3("viewPos", programState->camera.Position);
         //dirlight
         groundShader.setVec3("directional.direction", directional.direction);
         groundShader.setVec3("directional.ambient", directional.ambient);
@@ -542,8 +612,8 @@ int main(){
             groundShader.setVec3("pointlight[" + std::to_string(i) + "].specular", pointLights.specular * 0.0f);
         }
         //Spotlight
-        groundShader.setVec3("spotlight.position", camera.Position);
-        groundShader.setVec3("spotlight.direction", camera.Front);
+        groundShader.setVec3("spotlight.position", programState->camera.Position);
+        groundShader.setVec3("spotlight.direction", programState->camera.Front);
         groundShader.setVec3("spotlight.ambient", spotlight.ambient);
         groundShader.setVec3("spotlight.diffuse", spotlight.diffuse);
 
@@ -569,7 +639,7 @@ int main(){
         //skybox at last
         glDepthFunc(GL_LEQUAL);  // depth test passes when values are equal to depth buffer's content
         skyboxShader.use();
-        view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // remove translation from the view matrix
+        view = glm::mat4(glm::mat3(programState->camera.GetViewMatrix())); // remove translation from the view matrix
         skyboxShader.setMat4("view", view);
         skyboxShader.setMat4("projection", projection);
 
@@ -628,10 +698,20 @@ int main(){
         std::cout << (gammaEnabled ? "Gamma enabled" : "Gamma disabled") << std::endl;
 //----------------------------------------------------------
 
+        if(programState->ImGuiEnabled)
+            DrawImGui(programState);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    programState->SaveToDisk(FileSystem::getPath("resources/programState.txt"));
+
+    //Imgui CleanUp
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+    delete programState;
 
     glfwTerminate();
     return 0;
@@ -647,13 +727,13 @@ void procesInput(GLFWwindow *window){
     }
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
+        programState->camera.ProcessKeyboard(FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
+        programState->camera.ProcessKeyboard(BACKWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
+        programState->camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
+        programState->camera.ProcessKeyboard(RIGHT, deltaTime);
 
     //gamma correction
     if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS && !gammaKeyPressed){
@@ -711,6 +791,7 @@ void procesInput(GLFWwindow *window){
         grayscaleKeyPressed= false;
     }
 
+
 }
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos){
@@ -726,12 +807,14 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos){
     lastX = xpos;
     lastY = ypos;
 
-    camera.ProcessMouseMovement(xoffset, yoffset);
+    if(!programState->ImGuiEnabled){
+        programState->camera.ProcessMouseMovement(xoffset, yoffset);
+    }
 
 }
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset){
 
-    camera.ProcessMouseScroll(yoffset);
+    programState->camera.ProcessMouseScroll(yoffset);
 }
 
 //loading 2D textures
@@ -998,4 +1081,105 @@ unsigned int loadCubemap(vector<std::string> faces)
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     return textureID;
+}
+
+//ImGui
+void DrawImGui(ProgramState* programState){
+
+    //ImGui Frame Init
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    {
+
+        ImGui::Begin("General settings:");
+        ImGui::Text("Welcome to Tatooine!");
+        ImGui::Checkbox("Camera info", &cameraInfo);
+
+        ImGui::Bullet();
+        ImGui::Checkbox("Grayscale (shortcut: X)", &grayscale);
+
+
+        ImGui::Bullet();
+        ImGui::Checkbox("Blinn-Phong (shortcut: B)", &blinn);
+
+        ImGui::Bullet();
+        ImGui::Checkbox("Gamma Correction (shortcut: C)", &gammaEnabled);
+        ImGui::SameLine();
+        Help("Better without gamma correction!");
+
+        ImGui::Bullet();
+        ImGui::Checkbox("HDR (shortcut: H)", &hdr);
+        ImGui::SameLine();
+        ImGui::Bullet();
+        ImGui::Checkbox("Bloom (shortcut: SPACE)", &bloom);
+
+        ImGui::Spacing();
+        ImGui::Bullet();
+        ImGui::DragFloat("Exposure", &exposure, 0.05f, 0.13f, 2.0f);
+        ImGui::SameLine();
+        Help("Use Q and E to decrease/increase exposure level");
+
+        ImGui::Bullet();
+        ImGui::DragFloat("Sphere rotation speed", (float*)&programState->angular_speed, 0.05f, 0.0f, 3.0f);
+
+        ImGui::End();
+    }
+
+    if(cameraInfo){
+        ImGui::Begin("Camera settings:");
+        ImGui::Text("Camera Info:");
+
+        ImGui::Indent();
+        ImGui::Bullet();
+        ImGui::Text("Camera position: (%f, %f, %f)", programState->camera.Position.x, programState->camera.Position.y, programState->camera.Position.z);
+
+        ImGui::Bullet();
+        ImGui::Text("(Yaw, Pitch): (%f, %f)", programState->camera.Yaw, programState->camera.Pitch);
+
+        ImGui::Bullet();
+        ImGui::Text("Camera front: (%f, %f, %f)", programState->camera.Front.x, programState->camera.Front.y, programState->camera.Front.z);
+
+        if (ImGui::Button("Close Me"))
+            cameraInfo = false;
+
+        ImGui::End();
+    }
+
+
+    //ImGui render
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+}
+
+void keycallback(GLFWwindow* window, int key, int scanode, int action, int mods){
+    if(key == GLFW_KEY_G && action == GLFW_PRESS){
+
+        programState->ImGuiEnabled = !programState->ImGuiEnabled;
+        if(programState->ImGuiEnabled)
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        else
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    }
+}
+
+static void Help(const char* desc, bool extraText)
+{
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        ImGui::TextUnformatted(desc);
+        if(extraText){
+            ImGui::Spacing();
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.8f, 0.7f), "`What did that sign say again?`");
+        }
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
 }
