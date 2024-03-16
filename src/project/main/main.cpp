@@ -40,6 +40,8 @@ bool gammaEnabled = false;
 bool gammaKeyPressed = false;
 bool blinn = false;
 bool blinnKeyPressed = false;
+bool hdr = true;
+bool hdrKeyPressed = false;
 bool bloom = true;
 bool bloomKeyPressed = false;
 float exposure = 0.77f;
@@ -613,12 +615,15 @@ int main(){
         glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMultiSampled);
         finalShader.setInt("SCR_WIDTH", SCR_WIDTH);
         finalShader.setInt("SCR_HEIGHT", SCR_HEIGHT);
+
+        finalShader.setInt("hdr", hdr);
         finalShader.setInt("bloom", bloom);
         finalShader.setFloat("exposure", exposure);
         finalShader.setInt("gammaEnabled",gammaEnabled);
         finalShader.setInt("grayscale", grayscale);
         renderQuad();
 
+        std::cout << "hdr: " << (hdr ? "on" : "off") << std::endl;
         std::cout << "bloom: " << (bloom ? "on" : "off") << "| exposure: " << exposure << std::endl;
         std::cout << (gammaEnabled ? "Gamma enabled" : "Gamma disabled") << std::endl;
 //----------------------------------------------------------
@@ -667,6 +672,15 @@ void procesInput(GLFWwindow *window){
     }
     if (glfwGetKey(window, GLFW_KEY_B) == GLFW_RELEASE){
         blinnKeyPressed = false;
+    }
+
+    //HDR
+    if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS && !hdrKeyPressed){
+        hdr = !hdr;
+        hdrKeyPressed = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_H) == GLFW_RELEASE){
+        hdrKeyPressed = false;
     }
 
     //Bloom

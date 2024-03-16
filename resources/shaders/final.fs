@@ -8,6 +8,8 @@ uniform int SCR_HEIGHT;
 
 uniform sampler2DMS scene;
 uniform sampler2DMS bloomBlur;
+
+uniform bool hdr;
 uniform bool bloom;
 uniform bool gammaEnabled;
 uniform float exposure;
@@ -38,8 +40,14 @@ void main(){
 
     if(bloom)
         hdrColor += bloomColor; // additive blending
-    // tone mapping
-    vec3 result = vec3(1.0) - exp(-hdrColor * exposure);
+
+    vec3 result;
+    if(hdr)
+       //tone mapping
+       result = vec3(1.0) - exp(-hdrColor * exposure);
+    else
+       result = hdrColor;
+
     // gamma correction
     if(gammaEnabled)
         result = pow(result, vec3(1.0 / gamma));
