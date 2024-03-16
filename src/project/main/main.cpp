@@ -113,12 +113,15 @@ int main(){
 
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     Shader groundShader(FileSystem::getPath("resources/shaders/ground.vs").c_str(), FileSystem::getPath("resources/shaders/ground.fs").c_str());
     Shader modelShader(FileSystem::getPath("resources/shaders/models.vs").c_str(), FileSystem::getPath("resources/shaders/models.fs").c_str());
     Shader lightShader(FileSystem::getPath("resources/shaders/models.vs").c_str(), FileSystem::getPath("resources/shaders/lightCubes.fs").c_str());
     Shader blurShader(FileSystem::getPath("resources/shaders/blur.vs").c_str(), FileSystem::getPath("resources/shaders/blur.fs").c_str());
     Shader finalShader(FileSystem::getPath("resources/shaders/final.vs").c_str(), FileSystem::getPath("resources/shaders/final.fs").c_str());
+    Shader blendShader(FileSystem::getPath("resources/shaders/blending.vs").c_str(), FileSystem::getPath("resources/shaders/blending.fs").c_str());
     Shader skyboxShader(FileSystem::getPath("resources/shaders/skybox.vs").c_str(), FileSystem::getPath("resources/shaders/skybox.fs").c_str());
 
     Model tatooine(FileSystem::getPath("resources/objects/tatooine/scene.gltf"));
@@ -130,6 +133,7 @@ int main(){
     Model sphere(FileSystem::getPath("resources/objects/sfera/scene.gltf"));
     sphere.SetTextureNamePrefix("material.");
 
+    unsigned int transparentTexture = loadTexture(FileSystem::getPath("resources/textures/grass.png").c_str());
 
     stbi_set_flip_vertically_on_load(true);
 
@@ -199,8 +203,9 @@ int main(){
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
             std::cout << "Framebuffer not complete!" << std::endl;
     }
-//----------------------------------------------------------
 
+    //Lights
+//----------------------------------------------------------
 
     //directional light init
     DirLight directional;
@@ -246,6 +251,8 @@ int main(){
     spotlight.cutOff = glm::cos(glm::radians(12.5f));
     spotlight.outerCutOff = glm::cos(glm::radians(17.0f));
 
+//----------------------------------------------------------
+
     //translation for houses
     glm::vec3 translation[10];
     float z[12] = {
@@ -256,6 +263,38 @@ int main(){
             0.0f, -10.0, 8.0f, 2.0f, 12.0f, -15.0,
             0.0f, -6.0f, 9.f, -10.0f, 11.0, -15.0f
     };
+
+    float transparentVertices[] = {
+            // positions         // texture Coords
+            0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
+            0.0f, -0.5f,  0.0f,  0.0f,  1.0f,
+            1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
+
+            0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
+            1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
+            1.0f,  0.5f,  0.0f,  1.0f,  0.0f
+    };
+
+    vector<glm::vec3> grassPosition{
+            glm::vec3( 1.6f, -0.2f, -1.4f),
+            glm::vec3(1.9f, -0.2f, -1.5f),
+            glm::vec3(9.5f, -0.2f, -7.9f),
+            glm::vec3(9.8f, -0.2f, -7.8f),
+            glm::vec3(-2.6f, -0.2f, 9.6f),
+            glm::vec3(-2.8f, -0.2f, 9.7f)
+    };
+
+    unsigned int transparentVAO, transparentVBO;
+    glGenVertexArrays(1, &transparentVAO);
+    glGenBuffers(1, &transparentVBO);
+    glBindVertexArray(transparentVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, transparentVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(transparentVertices), transparentVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glBindVertexArray(0);
 
     float skyboxVertices[] = {
             // positions
@@ -331,6 +370,8 @@ int main(){
     groundShader.setInt("diffuseMap", 0);
     groundShader.setInt("normalMap", 1);
     groundShader.setInt("depthMap", 2);
+    blendShader.use();
+    blendShader.setInt("texture1", 0);
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
 
@@ -345,6 +386,14 @@ int main(){
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        //sort the transparent grass before rendering
+        std::map<float, glm::vec3> sorted;
+        for (unsigned int i = 0; i < grassPosition.size(); i++)
+        {
+            float distance = glm::length(camera.Position - grassPosition[i]);
+            sorted[distance] = grassPosition[i];
+        }
 
         //render scene into floating point framebuffer
 //----------------------------------------------------------
@@ -442,6 +491,23 @@ int main(){
 
         }
 
+        //grass
+        glDisable(GL_CULL_FACE);
+        blendShader.use();
+        blendShader.setMat4("projection", projection);
+        blendShader.setMat4("view", view);
+        glBindVertexArray(transparentVAO);
+        glBindTexture(GL_TEXTURE_2D, transparentTexture);
+        for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it)
+        {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, it->second);
+            model = glm::scale(model, glm::vec3(1.0f));
+            blendShader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+        glEnable(GL_CULL_FACE);
+
         //light cubes
         lightShader.use();
         lightShader.setMat4("projection", projection);
@@ -504,7 +570,7 @@ int main(){
         view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // remove translation from the view matrix
         skyboxShader.setMat4("view", view);
         skyboxShader.setMat4("projection", projection);
-        
+
         glBindVertexArray(skyboxVAO);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
