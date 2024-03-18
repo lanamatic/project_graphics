@@ -534,7 +534,7 @@ int main(){
 
         //mandalorian & grogu
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(3.0f, -0.6f, 1.0f));
+        model = glm::translate(model, glm::vec3(3.0f, -0.83f, 1.0f));
         model = glm::rotate(model, (float)glm::radians(-90.0), glm::vec3(1, 0, 0));
         model = glm::rotate(model, (float)glm::radians(-45.0), glm::vec3(0, 0, 1));
         model = glm::scale(model, glm::vec3(0.1));
