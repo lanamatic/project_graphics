@@ -713,6 +713,9 @@ int main(){
     ImGui::DestroyContext();
     delete programState;
 
+    glDeleteVertexArrays(1, &skyboxVAO);
+    glDeleteBuffers(1, &skyboxVBO);
+
     glfwTerminate();
     return 0;
 }
