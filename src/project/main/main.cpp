@@ -423,6 +423,7 @@ int main(){
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
+    stbi_set_flip_vertically_on_load(false);
     vector<std::string> faces
             {
                     FileSystem::getPath("resources/textures/skybox/right.jpg"),
@@ -433,6 +434,7 @@ int main(){
                     FileSystem::getPath("resources/textures/skybox/back.jpg")
             };
     unsigned int cubemapTexture = loadCubemap(faces);
+    stbi_set_flip_vertically_on_load(true);
 
     blurShader.use();
     blurShader.setInt("image", 0);
