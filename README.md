@@ -31,3 +31,9 @@ Grass texture - made in Canva
 Year: 2023/2024 \
 Teaching Assistant: Marko Spasić \
 Professor: Vesna Marinković
+
+## Gallery
+![photo 1](/resources/gallery/mandalorian.png)
+![photo 2](/resources/gallery/zoom.png)
+![photo 3](/resources/gallery/sky.png)
+
